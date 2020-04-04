@@ -5,7 +5,7 @@ import {Icon} from '@ant-design/compatible';
 import './index.less'
 import logo from '../../assets/images/logo.png'
 import menuList from '../../config/menuConfig'
-
+import memoryUtils from "../../utils/memoryUtils";
 
 const SubMenu = Menu.SubMenu
 
@@ -14,36 +14,43 @@ const SubMenu = Menu.SubMenu
 */
 class LeftNav extends Component {
 
-    getMenuNodes = (menuList) => {
+    hasAuth = (item) => {
+        const key = item.key
+        const menuSet = this.menuSet
+        if(item.isPublic || memoryUtils.user.username==='admin' || menuSet.has(key)) {
+            return true
+            // 4. 如果有子节点, 需要判断有没有一个 child 的 key 在 menus 中
+        } else if(item.children){
+            return !!item.children.find(child => menuSet.has(child.key))
+        }
+    }
+
+    getMenuNodes = (list) => {
 // 得到当前请求的 path
         const path = this.props.location.pathname
-        return menuList.reduce((pre, item) => {
-            if (!item.children) {
-                pre.push((
-                    <Menu.Item key={item.key}>
-                        <Link to={item.key}>
-                            <Icon type={item.icon}/>
-                            <span>{item.title}</span>
-                        </Link>
-                    </Menu.Item>
-                ))
-            } else {
-                pre.push((
-                    <SubMenu
-                        key={item.key}
-                        title={
-                            <span>
-<Icon type={item.icon}/>
-<span>{item.title}</span>
-</span>
-                        }
-                    >
-                        {this.getMenuNodes(item.children)}
-                    </SubMenu>
-                ))
-// 如果当前请求路由与当前菜单的某个子菜单的 key 匹配, 将菜单的 key 保存为 openKey
-                if (item.children.find(cItem => path.indexOf(cItem.key) === 0)) {
-                    this.openKey = item.key
+        return list.reduce((pre, item) => {
+            if (this.hasAuth(item)) {
+                if (!item.children) {
+                    pre.push((
+                        <Menu.Item key={item.key}>
+                            <Link to={item.key}>
+                                <Icon type={item.icon}/>
+                                <span>{item.title}</span>
+                            </Link>
+                        </Menu.Item>
+                    ))
+                } else {
+                    pre.push((
+                        <SubMenu key={item.key} title={<span><Icon
+                            type={item.icon}/><span>{item.title}</span></span>}>
+                            {
+                                this.getMenuNodes(item.children)
+                            }
+                        </SubMenu>
+                    ))
+                    if(item.children.find(cItem => path.indexOf(cItem.key)===0)) {
+                        this.openKey = item.key
+                    }
                 }
             }
             return pre
@@ -88,8 +95,8 @@ class LeftNav extends Component {
 
 
     componentWillMount() {
-// this.menuNodes = this.getMenuNodes(menuConfig)
-        this.menuNodes = this.getMenuNodes2(menuList)
+        this.menuSet = new Set(memoryUtils.user.role.menus || [])
+        this.menuNodes = this.getMenuNodes(menuList)
     }
 
     render() {
